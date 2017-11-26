@@ -1,15 +1,15 @@
 extern crate ordered_float;
 
 use aabb::AABB;
-use shape::Shape;
+use shape::*;
 use ray::Ray;
 use intersection::Intersection;
-use std::rc::Rc;
+use std::sync::Arc;
 use self::ordered_float::OrderedFloat;
 
 pub struct Node {
   aabb: AABB,
-  children: Vec<Rc<Shape>>
+  children: Vec<Arc<Shape + Sync + Send>>
 }
 
 impl Shape for Node {
@@ -32,7 +32,7 @@ impl Shape for Node {
 
 pub struct Leaf {
   aabb: AABB,
-  object: Rc<Shape>,
+  object: Arc<SurfaceShape + Sync + Send>,
 }
 
 impl Shape for Leaf {
@@ -50,7 +50,7 @@ impl Shape for Leaf {
 }
 
 pub struct BVH {
-  tree: Rc<Shape>,
+  tree: Arc<Shape + Sync + Send>,
 }
 
 impl Shape for BVH {
@@ -64,10 +64,10 @@ impl Shape for BVH {
 }
 
 impl BVH {
-  pub fn new(objects: Vec<Rc<Shape>>) -> BVH {
+  pub fn new(objects: Vec<Arc<SurfaceShape + Sync + Send>>) -> BVH {
     // 実体
     let mut instance = objects.into_iter().map( |s|
-      Rc::new(Leaf {
+      Arc::new(Leaf {
         aabb: s.aabb(),
         object: s,
       })
@@ -77,7 +77,7 @@ impl BVH {
     }
   }
 
-  fn construct(list: &mut [Rc<Leaf>], depth: usize) -> Rc<Shape> {
+  fn construct(list: &mut [Arc<Leaf>], depth: usize) -> Arc<Shape + Sync + Send> {
     // セットアップ
     let len = list.len();
     let partition_count = 2usize;
@@ -105,7 +105,7 @@ impl BVH {
         Some(Self::construct(&mut list[start..end], depth + 1))
       }
     }).collect();
-    Rc::new(Node {
+    Arc::new(Node {
       aabb: aabb,
       children: children,
     })

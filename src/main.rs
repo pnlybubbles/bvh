@@ -20,17 +20,17 @@ use vector::*;
 use triangle::Triangle;
 use intersection::Intersection;
 use bvh::BVH;
-use shape::Shape;
+use shape::*;
 use ray::Ray;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 fn main() {
   let objects = obj(&Path::new("models/simple/debug.obj"));
   BVH::new(objects);
 }
 
-fn brute_force(objects: &Vec<Rc<Shape>>, ray: &Ray) -> Option<Intersection> {
+fn brute_force(objects: &Vec<Arc<Shape + Sync + Send>>, ray: &Ray) -> Option<Intersection> {
   objects.iter().flat_map(|v| v.intersect(&ray)).min_by(
     |a, b| {
       a.distance.partial_cmp(&b.distance).unwrap()
@@ -38,8 +38,8 @@ fn brute_force(objects: &Vec<Rc<Shape>>, ray: &Ray) -> Option<Intersection> {
   )
 }
 
-fn obj(path: &Path) -> Vec<Rc<Shape>> {
-  let mut objects: Vec<Rc<Shape>> = Vec::new();
+fn obj(path: &Path) -> Vec<Arc<SurfaceShape + Sync + Send>> {
+  let mut objects: Vec<Arc<SurfaceShape + Sync + Send>> = Vec::new();
   let obj = tobj::load_obj(&path);
   assert!(obj.is_ok());
   let (models, _) = obj.unwrap();
@@ -56,7 +56,7 @@ fn obj(path: &Path) -> Vec<Rc<Shape>> {
           mesh.positions[mesh.indices[index] as usize * 3 + 2] as f64,
         );
       }
-      objects.push(Rc::new(Triangle::new(polygon[0], polygon[1], polygon[2])));
+      objects.push(Arc::new(Triangle::new(polygon[0], polygon[1], polygon[2])));
     }
   }
   objects
