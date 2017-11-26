@@ -4,4 +4,7 @@ name = "bvh"
 version = "0.1.0"
 
 [dependencies]
+flame = "0.2.0"
 ordered-float = "0.5.0"
+rand = "0.3.18"
+tobj = "0.1.6"

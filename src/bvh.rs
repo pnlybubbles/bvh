@@ -2,7 +2,6 @@ extern crate ordered_float;
 
 use aabb::AABB;
 use shape::Shape;
-use vector::Vector;
 use ray::Ray;
 use intersection::Intersection;
 use std::rc::Rc;
@@ -33,8 +32,7 @@ impl Shape for Node {
 
 pub struct Leaf {
   aabb: AABB,
-  id: usize,
-  object: Box<Shape>,
+  object: Rc<Shape>,
 }
 
 impl Shape for Leaf {
@@ -65,84 +63,48 @@ impl Shape for BVH {
   }
 }
 
-type Axis = Vec<Vec<Rc<Leaf>>>;
-
 impl BVH {
-  pub fn new(objects: Vec<Box<Shape>>) -> BVH {
+  pub fn new(objects: Vec<Rc<Shape>>) -> BVH {
     // 実体
-    let instance = objects.into_iter().enumerate().map( |(i, s)|
+    let mut instance = objects.into_iter().map( |s|
       Rc::new(Leaf {
         aabb: s.aabb(),
-        id: i,
         object: s,
       })
     ).collect::<Vec<_>>();
-    // 各軸に射影したAABBをソート
-    let mut axis = (0..3).map( |_|
-      instance.iter().cloned().collect::<Vec<_>>()
-    ).collect::<Vec<_>>();
-    for (i, a) in axis.iter_mut().enumerate() {
-      a.sort_unstable_by_key( |v| OrderedFloat(v.aabb.center.to_array()[i]) )
-    }
     BVH {
-      tree: Self::construct(axis),
+      tree: Self::construct(&mut instance, 0),
     }
   }
 
-  fn construct(axis: Axis) -> Rc<Shape> {
+  fn construct(list: &mut [Rc<Leaf>], depth: usize) -> Rc<Shape> {
     // セットアップ
-    let len = axis[0].len();
-    let partition_count = 2;
-    let size = len / partition_count;
+    let len = list.len();
+    let partition_count = 2usize;
+    let size = (len as f64 / partition_count as f64).ceil() as usize;
     // 要素が1つのときは葉
     if len == 1 {
-      return axis[0][0].clone();
+      return list[0].clone();
     }
     // 全体のAABBを作成
-    let min = Vector::from_index( |i|
-      axis[i][0].aabb.min.to_array()[i]
-    );
-    let max = Vector::from_index( |i|
-      axis[i].last().unwrap().aabb.max.to_array()[i]
-    );
-    let aabb = AABB {
-      min: min,
-      max: max,
-      center: (min + max) / 2.0,
-    };
+    let aabb = AABB::merge(&list.iter().map( |v| &v.aabb ).collect());
     // 最大のAABBの辺を基準にして分割する
     // 最大のAABBの辺のインデックスを取得
-    let max_side_index = aabb
-      .side()
-      .to_array()
-      .to_vec()
-      .iter()
-      .enumerate()
-      .max_by_key( |&(_, v)| OrderedFloat(*v) )
-      .map( |(i, _)| i )
-      .unwrap_or(0);
-    // 基準の軸を分割
-    let partitioned_max_axis = (0..partition_count).map( |p| {
+    let max_side_index = aabb.side().to_array().to_vec().iter()
+      .enumerate().max_by_key( |&(_, v)| OrderedFloat(*v) )
+      .map( |(i, _)| i ).unwrap_or(0);
+    // 基準の軸でソート
+    list.sort_unstable_by_key( |v| OrderedFloat(v.aabb.center[max_side_index]) );
+    // 再帰的に子要素を生成
+    let children = (0..partition_count).flat_map( |p| {
       let start = size * p;
       let end = if p == partition_count - 1 { len } else { size * (p + 1) };
-      axis[max_side_index][start..end].iter().cloned().collect::<Vec<_>>()
-    }).collect::<Vec<_>>();
-    // 基準以外の軸も分割
-    let partitioned_axis = (0..partition_count).map( |p| {
-      (0..3).map( |i| {
-        if i == max_side_index {
-          partitioned_max_axis[p].iter().cloned().collect()
-        } else {
-          axis[i].iter().filter( |v|
-            partitioned_max_axis[p].iter().find( |u| u.id == v.id).is_some()
-          ).cloned().collect()
-        }
-      }).collect()
-    }).collect::<Vec<_>>();
-    // 再帰的に子要素を生成
-    let children = partitioned_axis.into_iter().map( |a|
-      Self::construct(a)
-    ).collect();
+      if start >= len {
+        None
+      } else {
+        Some(Self::construct(&mut list[start..end], depth + 1))
+      }
+    }).collect();
     Rc::new(Node {
       aabb: aabb,
       children: children,
