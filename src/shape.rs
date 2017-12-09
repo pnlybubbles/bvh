@@ -3,7 +3,7 @@ use ray::Ray;
 use aabb::AABB;
 
 pub trait SurfaceShape: Shape {
-  fn area(&self) -> f64;
+  fn area(&self) -> f32;
 }
 
 pub trait Shape {

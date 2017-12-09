@@ -20,14 +20,14 @@ impl AABB {
 
   pub fn merge(list: &Vec<&AABB>) -> AABB {
     let min = Vector::new(
-      *list.iter().map(|v| OrderedFloat(v.max.x)).max().unwrap(),
-      *list.iter().map(|v| OrderedFloat(v.max.y)).max().unwrap(),
-      *list.iter().map(|v| OrderedFloat(v.max.z)).max().unwrap(),
-    );
-    let max = Vector::new(
       *list.iter().map(|v| OrderedFloat(v.min.x)).min().unwrap(),
       *list.iter().map(|v| OrderedFloat(v.min.y)).min().unwrap(),
       *list.iter().map(|v| OrderedFloat(v.min.z)).min().unwrap(),
+    );
+    let max = Vector::new(
+      *list.iter().map(|v| OrderedFloat(v.max.x)).max().unwrap(),
+      *list.iter().map(|v| OrderedFloat(v.max.y)).max().unwrap(),
+      *list.iter().map(|v| OrderedFloat(v.max.z)).max().unwrap(),
     );
     AABB {
       min: min,
@@ -41,8 +41,8 @@ impl AABB {
     let direction = ray.direction.to_array();
     let aabb_min = self.min.to_array();
     let aabb_max = self.max.to_array();
-    let mut min = -10e8f64;
-    let mut max = 10e8f64;
+    let mut min = -10e8f32;
+    let mut max = 10e8f32;
     for i in 0..3 {
       let t1 = (aabb_min[i] - origin[i]) / direction[i];
       let t2 = (aabb_max[i] - origin[i]) / direction[i];

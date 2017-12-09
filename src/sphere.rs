@@ -6,7 +6,7 @@ use shape::Shape;
 use aabb::AABB;
 
 pub struct Sphere {
-  pub radius: f64,
+  pub radius: f32,
   pub position: Vector,
 }
 

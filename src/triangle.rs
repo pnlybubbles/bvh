@@ -14,7 +14,7 @@ pub struct Triangle {
   pub p1: Vector,
   pub p2: Vector,
   pub normal: Vector,
-  pub area: f64,
+  pub area: f32,
 }
 
 impl Triangle {
@@ -116,7 +116,7 @@ impl Shape for Triangle {
 }
 
 impl SurfaceShape for Triangle {
-  fn area(&self) -> f64 {
+  fn area(&self) -> f32 {
     self.area
   }
 }
