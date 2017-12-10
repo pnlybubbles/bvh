@@ -5,23 +5,23 @@ use intersection::Intersection;
 use shape::*;
 use constant::*;
 use ray::Ray;
-use vector::Vector;
-use vector::*;
+use math::vector::Vector3;
+use math::vector::*;
 use aabb::AABB;
 
 pub struct Triangle {
-  pub p0: Vector,
-  pub p1: Vector,
-  pub p2: Vector,
-  pub normal: Vector,
+  pub p0: Vector3,
+  pub p1: Vector3,
+  pub p2: Vector3,
+  pub normal: Vector3,
   pub area: f32,
 }
 
 impl Triangle {
   pub fn new(
-    p0: Vector,
-    p1: Vector,
-    p2: Vector,
+    p0: Vector3,
+    p1: Vector3,
+    p2: Vector3,
   ) -> Triangle {
     Triangle {
       p0: p0,
@@ -97,12 +97,12 @@ impl Shape for Triangle {
   }
 
   fn aabb(&self) -> AABB {
-    let min = Vector::new(
+    let min = Vector3::new(
       self.p0.x.min(self.p1.x).min(self.p2.x),
       self.p0.y.min(self.p1.y).min(self.p2.y),
       self.p0.z.min(self.p1.z).min(self.p2.z),
     );
-    let max = Vector::new(
+    let max = Vector3::new(
       self.p0.x.max(self.p1.x).max(self.p2.x),
       self.p0.y.max(self.p1.y).max(self.p2.y),
       self.p0.z.max(self.p1.z).max(self.p2.z),

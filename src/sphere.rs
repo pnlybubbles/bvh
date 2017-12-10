@@ -1,4 +1,4 @@
-use vector::*;
+use math::vector::*;
 use ray::Ray;
 use intersection::Intersection;
 use constant::*;
@@ -7,7 +7,7 @@ use aabb::AABB;
 
 pub struct Sphere {
   pub radius: f32,
-  pub position: Vector,
+  pub position: Vector3,
 }
 
 impl Shape for Sphere {
@@ -34,7 +34,7 @@ impl Shape for Sphere {
   }
 
   fn aabb(&self) -> AABB {
-    let r = Vector::new(self.radius, self.radius, self.radius);
+    let r = Vector3::new(self.radius, self.radius, self.radius);
     AABB {
       min: self.position - r,
       max: self.position + r,

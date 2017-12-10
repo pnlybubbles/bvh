@@ -7,7 +7,7 @@ extern crate rand;
 extern crate test;
 extern crate time;
 
-mod vector;
+mod math;
 mod shape;
 mod sphere;
 mod triangle;
@@ -17,7 +17,7 @@ mod aabb;
 mod constant;
 mod bvh;
 
-use vector::*;
+use math::vector::*;
 use triangle::Triangle;
 use intersection::Intersection;
 use bvh::BVH;
@@ -87,7 +87,7 @@ fn get_ray_in_aabb(i: usize, j: usize, split: usize, aabb: AABB) -> Ray {
   let x = aabb.min.x + (aabb.max.x - aabb.min.x) * (i as f32 / split as f32);
   let y = aabb.min.y + (aabb.max.y - aabb.min.y) * (j as f32 / split as f32);
   let z = aabb.min.z;
-  let origin = Vector::new(x, y, z);
+  let origin = Vector3::new(x, y, z);
   let direction = (aabb.center - origin).normalize();
   Ray {
     origin: origin,
@@ -104,27 +104,27 @@ fn brute_force(objects: &Vec<Arc<SurfaceShape + Sync + Send>>, ray: &Ray) -> Opt
 }
 
 fn obj(path: &Path) -> Vec<Arc<SurfaceShape + Sync + Send>> {
-  let mut objects: Vec<Arc<SurfaceShape + Sync + Send>> = Vec::new();
-  let obj = tobj::load_obj(&path);
-  assert!(obj.is_ok());
-  let (models, _) = obj.unwrap();
+  let (models, _) = tobj::load_obj(&path).unwrap();
+  let mut instances: Vec<Arc<SurfaceShape + Sync + Send>> = Vec::with_capacity(
+    models.iter().map( |m| m.mesh.indices.len() / 3).sum()
+  );
   for m in models {
     let mesh = &m.mesh;
-    println!("{}: {} ploygon", m.name, mesh.indices.len() / 3);
+    // println!("{}: {} ploygon", m.name, mesh.indices.len() / 3);
     for f in 0..mesh.indices.len() / 3 {
-      let mut polygon = [Vector::zero(); 3];
+      let mut polygon = [Vector3::zero(); 3];
       for i in 0..3 {
         let index: usize = f * 3 + i;
-        polygon[i] = Vector::new(
+        polygon[i] = Vector3::new(
           mesh.positions[mesh.indices[index] as usize * 3] as f32 * 100.0,
           mesh.positions[mesh.indices[index] as usize * 3 + 1] as f32 * 100.0,
           mesh.positions[mesh.indices[index] as usize * 3 + 2] as f32 * 100.0,
         );
       }
-      objects.push(Arc::new(Triangle::new(polygon[0], polygon[1], polygon[2])));
+      instances.push(Arc::new(Triangle::new(polygon[0], polygon[1], polygon[2])));
     }
   }
-  objects
+  instances
 }
 
 #[cfg(test)]
@@ -142,12 +142,12 @@ mod tests {
     let bvh = BVH::new(objects);
     let mut rng = rand::XorShiftRng::new_unseeded();
     for _ in 0..10000 {
-      let origin = Vector::new(
+      let origin = Vector3::new(
         rng.gen_range(-10.0f32, 10.0),
         rng.gen_range(-10.0f32, 10.0),
         rng.gen_range(-10.0f32, 10.0),
       );
-      let direction = Vector::new(
+      let direction = Vector3::new(
         rng.gen_range(-1.0f32, 1.0),
         rng.gen_range(-1.0f32, 1.0),
         rng.gen_range(-1.0f32, 1.0),
@@ -176,29 +176,25 @@ mod tests {
     }
   }
 
-  fn random_ray_in_aabb<F, R>(aabb: &AABB, count: usize, mut rng: R, f: F)
+  fn random_ray_in_aabb<R>(aabb: &AABB, count: usize, mut rng: R) -> Vec<Ray>
     where
       R: Rng,
-      F: Fn(&Ray),
   {
-    let min = aabb.min.to_array();
-    let max = aabb.max.to_array();
     let diagnal = (aabb.max - aabb.min).norm();
-    for _ in 0..count {
-      let from = Vector::from_index( |i|
-        (max[i] - min[i]) * rng.gen_range(-1.0f32, 1.0)
-      );
-      let to = Vector::from_index( |i|
-        (max[i] - min[i]) * rng.gen_range(-1.0f32, 1.0)
-      );
+    (0..count).map( |_| {
+      let from: Vector3 = (0..3).map( |i|
+        (aabb.max[i] - aabb.min[i]) * rng.gen_range(-1.0f32, 1.0)
+      ).collect::<Vec<_>>().into();
+      let to: Vector3 = (0..3).map( |i|
+        (aabb.max[i] - aabb.min[i]) * rng.gen_range(-1.0f32, 1.0)
+      ).collect::<Vec<_>>().into();
       let direction = (to - from).normalize();
       let origin = from - direction * diagnal;
-      let ray = Ray {
+      Ray {
         origin: origin,
         direction: direction,
-      };
-      f(&ray)
     }
+    }).collect()
   }
 
   #[bench]
@@ -213,14 +209,15 @@ mod tests {
   #[bench]
   fn bench_intersection_bvh(b: &mut Bencher) {
     println!("");
-    let objects = obj(&Path::new("models/monkey/monkey.obj"));
+    let objects = obj(&Path::new("models/sponza/sponza.obj"));
     let bvh = BVH::new(objects);
-    b.iter( || {
       let mut rng = rand::XorShiftRng::new_unseeded();
-      random_ray_in_aabb(&bvh.aabb(), 1000, &mut rng, |ray| {
+    let random_rays = random_ray_in_aabb(&bvh.aabb(), 10000, &mut rng);
+    b.iter( || {
+      for ray in &random_rays {
         bvh.intersect(&ray);
-      });
-    })
+      }
+    });
   }
 
   #[bench]
@@ -236,4 +233,18 @@ mod tests {
       });
     })
   }
+
+  // #[bench]
+  // fn bench_intersection_brute_force(b: &mut Bencher) {
+  //   println!("");
+  //   let objects = obj(&Path::new("models/monkey/monkey.obj"));
+  //   let aabb_list = objects.iter().map( |v| v.aabb() ).collect::<Vec<_>>();
+  //   let aabb = AABB::merge(&aabb_list.iter().collect());
+  //   b.iter( || {
+  //     let mut rng = rand::XorShiftRng::new_unseeded();
+  //     random_ray_in_aabb(&aabb, 1000, &mut rng, |ray| {
+  //       brute_force(&objects, &ray);
+  //     });
+  //   })
+  // }
 }

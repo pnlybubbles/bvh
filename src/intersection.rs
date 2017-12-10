@@ -1,7 +1,7 @@
-use vector::Vector;
+use math::vector::Vector3;
 
 pub struct Intersection {
-  pub position: Vector,
+  pub position: Vector3,
   pub distance: f32,
-  pub normal: Vector,
+  pub normal: Vector3,
 }
