@@ -6,6 +6,7 @@ extern crate tobj;
 extern crate rand;
 extern crate test;
 extern crate time;
+extern crate bvh as svenstaro_bvh;
 
 mod math;
 mod shape;
@@ -134,6 +135,7 @@ mod tests {
   use rand::Rng;
   use aabb::AABB;
   use constant::*;
+  use svenstaro_bvh::aabb::Bounded;
 
   #[test]
   fn correct() {
@@ -193,25 +195,25 @@ mod tests {
       Ray {
         origin: origin,
         direction: direction,
-    }
+      }
     }).collect()
   }
 
-  #[bench]
-  fn bench_construct_bvh(b: &mut Bencher) {
-    println!("");
-    let objects = obj(&Path::new("models/bunny/bunny.obj"));
-    b.iter( || {
-      BVH::new(objects.iter().cloned().collect());
-    })
-  }
+  // #[bench]
+  // fn bench_construct_bvh(b: &mut Bencher) {
+  //   println!("");
+  //   let objects = obj(&Path::new("models/bunny/bunny.obj"));
+  //   b.iter( || {
+  //     BVH::new(objects.iter().cloned().collect());
+  //   })
+  // }
 
   #[bench]
   fn bench_intersection_bvh(b: &mut Bencher) {
     println!("");
     let objects = obj(&Path::new("models/sponza/sponza.obj"));
     let bvh = BVH::new(objects);
-      let mut rng = rand::XorShiftRng::new_unseeded();
+    let mut rng = rand::XorShiftRng::new_unseeded();
     let random_rays = random_ray_in_aabb(&bvh.aabb(), 10000, &mut rng);
     b.iter( || {
       for ray in &random_rays {
@@ -220,18 +222,72 @@ mod tests {
     });
   }
 
+  struct SvenstaroTriangle<'a> {
+    index: usize,
+    triangle: &'a Arc<SurfaceShape + Sync + Send>,
+  }
+
+  impl<'a> svenstaro_bvh::aabb::Bounded for SvenstaroTriangle<'a> {
+    fn aabb(&self) -> svenstaro_bvh::aabb::AABB {
+      let aabb = self.triangle.aabb();
+      let min = convert_nalgebra_point(aabb.min);
+      let max = convert_nalgebra_point(aabb.max);
+      svenstaro_bvh::aabb::AABB::with_bounds(min, max)
+    }
+  }
+
+  impl<'a> svenstaro_bvh::bounding_hierarchy::BHShape for SvenstaroTriangle<'a> {
+    fn set_bh_node_index(&mut self, index: usize) {
+      self.index = index;
+    }
+
+    fn bh_node_index(&self) -> usize {
+      self.index
+    }
+  }
+
+  fn convert_nalgebra_vector(v: Vector3) -> svenstaro_bvh::nalgebra::Vector3<f32> {
+    svenstaro_bvh::nalgebra::Vector3::new(v.x, v.y, v.z)
+  }
+
+  fn convert_nalgebra_point(v: Vector3) -> svenstaro_bvh::nalgebra::Point3<f32> {
+    svenstaro_bvh::nalgebra::Point3::new(v.x, v.y, v.z)
+  }
+
+  fn convert_point(v: svenstaro_bvh::nalgebra::Point3<f32>) -> Vector3 {
+    Vector3::new(v.x, v.y, v.z)
+  }
+
   #[bench]
-  fn bench_intersection_brute_force(b: &mut Bencher) {
+  fn bench_intersection_svenstaro_bvh(b: &mut Bencher) {
     println!("");
-    let objects = obj(&Path::new("models/monkey/monkey.obj"));
-    let aabb_list = objects.iter().map( |v| v.aabb() ).collect::<Vec<_>>();
-    let aabb = AABB::merge(&aabb_list.iter().collect());
+    let obj = obj(&Path::new("models/sponza/sponza.obj"));
+    let mut objects = obj.iter().enumerate().map( |(i, v)|
+      SvenstaroTriangle { index: i, triangle: v }
+    ).collect::<Vec<_>>();
+    let mut bounds = svenstaro_bvh::aabb::AABB::empty();
+    for triangle in &objects {
+      bounds.join_mut(&triangle.aabb());
+    }
+    let bvh = svenstaro_bvh::bvh::BVH::build(objects.as_mut_slice());
+    let mut rng = rand::XorShiftRng::new_unseeded();
+    let min = convert_point(bounds.min);
+    let max = convert_point(bounds.max);
+    let aabb = AABB {
+      min: min,
+      max: max,
+      center: min + max / 2.0,
+    };
+    let random_rays = random_ray_in_aabb(&aabb, 10000, &mut rng).iter().map( |ray| {
+      let origin = convert_nalgebra_point(ray.origin);
+      let direction = convert_nalgebra_vector(ray.direction);
+      svenstaro_bvh::ray::Ray::new(origin, direction)
+    }).collect::<Vec<_>>();
     b.iter( || {
-      let mut rng = rand::XorShiftRng::new_unseeded();
-      random_ray_in_aabb(&aabb, 1000, &mut rng, |ray| {
-        brute_force(&objects, &ray);
-      });
-    })
+      for ray in &random_rays {
+        bvh.traverse(&ray, &objects);
+      }
+    });
   }
 
   // #[bench]
