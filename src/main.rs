@@ -278,14 +278,20 @@ mod tests {
       max: max,
       center: min + max / 2.0,
     };
-    let random_rays = random_ray_in_aabb(&aabb, 10000, &mut rng).iter().map( |ray| {
+    let rays = random_ray_in_aabb(&aabb, 10000, &mut rng);
+    let random_rays = rays.iter().map( |ray| {
       let origin = convert_nalgebra_point(ray.origin);
       let direction = convert_nalgebra_vector(ray.direction);
-      svenstaro_bvh::ray::Ray::new(origin, direction)
+      (svenstaro_bvh::ray::Ray::new(origin, direction), ray)
     }).collect::<Vec<_>>();
     b.iter( || {
-      for ray in &random_rays {
-        bvh.traverse(&ray, &objects);
+      for &(ref ray, org_ray) in &random_rays {
+        let shapes = bvh.traverse(&ray, &objects);
+        shapes.iter().flat_map(|v| v.triangle.intersect(&org_ray)).min_by(
+          |a, b| {
+            a.distance.partial_cmp(&b.distance).unwrap()
+          },
+        );
       }
     });
   }
