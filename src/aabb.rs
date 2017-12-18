@@ -44,8 +44,9 @@ impl AABB {
     let mut min = -INF;
     let mut max = INF;
     for i in 0..3 {
-      let t1 = (self.min[i] - ray.origin[i]) / ray.direction[i];
-      let t2 = (self.max[i] - ray.origin[i]) / ray.direction[i];
+      let inv_d = 1.0 / ray.direction[i];
+      let t1 = (self.min[i] - ray.origin[i]) * inv_d;
+      let t2 = (self.max[i] - ray.origin[i]) * inv_d;
       let (t_min, t_max) = if t1 > t2 { (t2, t1) } else { (t1, t2) };
       if min < t_min {
         min = t_min
