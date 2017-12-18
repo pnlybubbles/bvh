@@ -1,6 +1,7 @@
 #![feature(box_syntax)]
 #![feature(test)]
 #![allow(dead_code)]
+#![feature(sort_unstable)]
 
 extern crate tobj;
 extern crate rand;
@@ -31,9 +32,7 @@ use aabb::AABB;
 
 fn main() {
   let split: usize = 100;
-  // let objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
-  let path = Path::new("models/happy_vrip/buddha.obj");
-  let objects = obj(&path);
+  let objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
   // let objects_ = obj(&path);
   let bvh = BVH::new(objects);
   println!("min {}", bvh.aabb().min);
@@ -44,8 +43,8 @@ fn main() {
       get_ray_in_aabb(i, j, split, bvh.aabb())
     ).collect::<Vec<_>>()
   ).collect::<Vec<_>>();
-  let intersect_count = pre.iter().flat_map( |ray| bvh.intersect(&ray) ).count();
-  println!("intersect count {}", intersect_count);
+  // let intersect_count = pre.iter().flat_map( |ray| bvh.intersect(&ray) ).count();
+  // println!("intersect count {}", intersect_count);
   // for ray in &pre {
   //   let bvh_i = bvh.intersect(&ray);
   //   let bf_i = brute_force(&objects_, &ray);
@@ -58,6 +57,10 @@ fn main() {
   //     }
   //   }
   // }
+  // for ray in &pre {
+  //   bvh.intersect(&ray);
+  // }
+  // panic!();
   let test_ray = get_ray_in_aabb(76, 48, split, bvh.aabb());
   let test_intersect = bvh.intersect(&test_ray);
   println!("test ray origin: {} direction: {}", test_ray.origin, test_ray.direction);
