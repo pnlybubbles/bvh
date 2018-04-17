@@ -5,7 +5,6 @@ use ray::Ray;
 use self::ordered_float::OrderedFloat;
 use constant::*;
 
-#[derive(Clone)]
 pub struct AABB {
   pub min: Vector3,
   pub max: Vector3,

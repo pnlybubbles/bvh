@@ -11,7 +11,6 @@ extern crate bvh as svenstaro_bvh;
 
 mod math;
 mod shape;
-mod sphere;
 mod triangle;
 mod ray;
 mod intersection;
@@ -26,21 +25,26 @@ use bvh::BVH;
 use shape::*;
 use ray::Ray;
 use std::path::Path;
-use std::sync::Arc;
 use aabb::AABB;
 // use constant::EPS;
 
 fn main() {
   let split: usize = 100;
-  let objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
+  // let mut objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
+  let objects = obj(&Path::new("models/monkey/monkey.obj"));
+  println!("obj loaded");
   // let objects_ = obj(&path);
-  let bvh = BVH::new(objects);
+  let start_time = time::now();
+  let bvh = BVH::new(&objects);
+  let end_time = time::now();
+  let elapse_time = (end_time - start_time).num_microseconds().unwrap();
+  println!("construction: {}us", elapse_time);
   println!("min {}", bvh.aabb().min);
   println!("max {}", bvh.aabb().max);
   println!("center {}", bvh.aabb().center);
-  let pre = (0..split + 1).flat_map( |i|
-    (0..split + 1).map( |j|
-      get_ray_in_aabb(i, j, split, bvh.aabb())
+  let pre = (0..split).flat_map( |i|
+    (0..split).map( |j|
+      get_ray_in_aabb(i, j, split - 1, bvh.aabb())
     ).collect::<Vec<_>>()
   ).collect::<Vec<_>>();
   // let intersect_count = pre.iter().flat_map( |ray| bvh.intersect(&ray) ).count();
@@ -61,11 +65,11 @@ fn main() {
   //   bvh.intersect(&ray);
   // }
   // panic!();
-  let test_ray = get_ray_in_aabb(76, 48, split, bvh.aabb());
+  let test_ray = get_ray_in_aabb(76, 48, split - 1, bvh.aabb());
   let test_intersect = bvh.intersect(&test_ray);
   println!("test ray origin: {} direction: {}", test_ray.origin, test_ray.direction);
   println!("test intersect coordinate {}", test_intersect.unwrap().position);
-  let results = (0..100).map( |i| {
+  let results = (0..10).map( |i| {
     let start_time = time::now();
     for ray in &pre {
       bvh.intersect(&ray);
@@ -87,7 +91,7 @@ fn main() {
   println!("standard error: {}", sigma);
 }
 
-fn get_ray_in_aabb(i: usize, j: usize, split: usize, aabb: AABB) -> Ray {
+fn get_ray_in_aabb(i: usize, j: usize, split: usize, aabb: &AABB) -> Ray {
   let x = aabb.min.x + (aabb.max.x - aabb.min.x) * (i as f32 / split as f32);
   let y = aabb.min.y + (aabb.max.y - aabb.min.y) * (j as f32 / split as f32);
   let z = aabb.min.z;
@@ -99,7 +103,7 @@ fn get_ray_in_aabb(i: usize, j: usize, split: usize, aabb: AABB) -> Ray {
   }
 }
 
-fn brute_force(objects: &Vec<Arc<SurfaceShape + Sync + Send>>, ray: &Ray) -> Option<Intersection> {
+fn brute_force(objects: &Vec<Box<Shape>>, ray: &Ray) -> Option<Intersection> {
   objects.iter().flat_map(|v| v.intersect(&ray)).min_by(
     |a, b| {
       a.distance.partial_cmp(&b.distance).unwrap()
@@ -107,9 +111,9 @@ fn brute_force(objects: &Vec<Arc<SurfaceShape + Sync + Send>>, ray: &Ray) -> Opt
   )
 }
 
-fn obj(path: &Path) -> Vec<Arc<SurfaceShape + Sync + Send>> {
+fn obj(path: &Path) -> Vec<Box<Shape>> {
   let (models, _) = tobj::load_obj(&path).unwrap();
-  let mut instances: Vec<Arc<SurfaceShape + Sync + Send>> = Vec::with_capacity(
+  let mut instances: Vec<Box<Shape>> = Vec::with_capacity(
     models.iter().map( |m| m.mesh.indices.len() / 3).sum()
   );
   for m in models {
@@ -125,7 +129,7 @@ fn obj(path: &Path) -> Vec<Arc<SurfaceShape + Sync + Send>> {
           mesh.positions[mesh.indices[index] as usize * 3 + 2] as f32 * 100.0,
         );
       }
-      instances.push(Arc::new(Triangle::new(polygon[0], polygon[1], polygon[2])));
+      instances.push(box Triangle::new(polygon[0], polygon[1], polygon[2]));
     }
   }
   instances
@@ -144,7 +148,7 @@ mod tests {
   fn correct() {
     let objects = obj(&Path::new("models/monkey/monkey.obj"));
     let objects_ = obj(&Path::new("models/monkey/monkey.obj"));
-    let bvh = BVH::new(objects);
+    let bvh = BVH::new(&objects);
     let mut rng = rand::XorShiftRng::new_unseeded();
     for _ in 0..10000 {
       let origin = Vector3::new(
@@ -202,22 +206,22 @@ mod tests {
     }).collect()
   }
 
-  // #[bench]
-  // fn bench_construct_bvh(b: &mut Bencher) {
-  //   println!("");
-  //   let objects = obj(&Path::new("models/bunny/bunny.obj"));
-  //   b.iter( || {
-  //     BVH::new(objects.iter().cloned().collect());
-  //   })
-  // }
+  #[bench]
+  fn bench_construct_bvh(b: &mut Bencher) {
+    println!("");
+    let objects = obj(&Path::new("models/bunny/bunny.obj"));
+    b.iter( || {
+      BVH::new(&objects);
+    })
+  }
 
   #[bench]
   fn bench_intersection_bvh(b: &mut Bencher) {
     println!("");
     let objects = obj(&Path::new("models/sponza/sponza.obj"));
-    let bvh = BVH::new(objects);
+    let bvh = BVH::new(&objects);
     let mut rng = rand::XorShiftRng::new_unseeded();
-    let random_rays = random_ray_in_aabb(&bvh.aabb(), 10000, &mut rng);
+    let random_rays = random_ray_in_aabb(&bvh.aabb(), 10, &mut rng);
     b.iter( || {
       for ray in &random_rays {
         bvh.intersect(&ray);
@@ -227,7 +231,7 @@ mod tests {
 
   struct SvenstaroTriangle<'a> {
     index: usize,
-    triangle: &'a Arc<SurfaceShape + Sync + Send>,
+    triangle: &'a Box<Shape>,
   }
 
   impl<'a> svenstaro_bvh::aabb::Bounded for SvenstaroTriangle<'a> {
@@ -281,7 +285,7 @@ mod tests {
       max: max,
       center: min + max / 2.0,
     };
-    let rays = random_ray_in_aabb(&aabb, 10000, &mut rng);
+    let rays = random_ray_in_aabb(&aabb, 10, &mut rng);
     let random_rays = rays.iter().map( |ray| {
       let origin = convert_nalgebra_point(ray.origin);
       let direction = convert_nalgebra_vector(ray.direction);

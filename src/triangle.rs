@@ -13,8 +13,8 @@ pub struct Triangle {
   pub p0: Vector3,
   pub p1: Vector3,
   pub p2: Vector3,
-  pub normal: Vector3,
-  pub area: f32,
+  aabb: AABB,
+  normal: Vector3,
 }
 
 impl Triangle {
@@ -27,38 +27,40 @@ impl Triangle {
       p0: p0,
       p1: p1,
       p2: p2,
-      normal: (p1 - p0).cross(p2 - p0).normalize(),
-      area: (p1 - p0).cross(p2 - p0).norm() * 0.5,
+      aabb: Self::aabb(p0, p1, p2),
+      normal: Self::normal(p0, p1, p2),
     }
   }
 
-  fn intersect_3c(&self, ray: &Ray) -> Option<Intersection> {
-    let dn = ray.direction.dot(self.normal);
-    let t = (self.p0 - ray.origin).dot(self.normal) / dn;
-    if t < EPS {
-      return None;
+  fn aabb(p0: Vector3, p1: Vector3, p2: Vector3) -> AABB {
+    let min = Vector3::new(
+      p0.x.min(p1.x).min(p2.x),
+      p0.y.min(p1.y).min(p2.y),
+      p0.z.min(p1.z).min(p2.z),
+    );
+    let max = Vector3::new(
+      p0.x.max(p1.x).max(p2.x),
+      p0.y.max(p1.y).max(p2.y),
+      p0.z.max(p1.z).max(p2.z),
+    );
+    AABB {
+      min: min,
+      max: max,
+      center: (max + min) / 2.0,
     }
-    let p = ray.origin + ray.direction * t;
-    let c0 = (self.p1 - self.p0).cross(p - self.p0);
-    if c0.dot(self.normal) < 0.0 {
-      return None;
-    }
-    let c1 = (self.p2 - self.p1).cross(p - self.p1);
-    if c1.dot(self.normal) < 0.0 {
-      return None;
-    }
-    let c2 = (self.p0 - self.p2).cross(p - self.p2);
-    if c2.dot(self.normal) < 0.0 {
-      return None;
-    }
-    Some(Intersection {
-      distance: t,
-      normal: self.normal,
-      position: p,
-    })
   }
 
-  fn intersect_mt(&self, ray: &Ray) -> Option<Intersection> {
+  fn normal(p0: Vector3, p1: Vector3, p2: Vector3) -> Vector3 {
+    (p1 - p0).cross(p2 - p0).normalize()
+  }
+}
+
+impl Shape for Triangle {
+  fn aabb(&self) -> &AABB {
+    &self.aabb
+  }
+
+  fn intersect(&self, ray: &Ray) -> Option<Intersection> {
     // Möller–Trumbore intersection algorithm
     let e1 = self.p1 - self.p0;
     let e2 = self.p2 - self.p0;
@@ -88,35 +90,5 @@ impl Triangle {
       normal: self.normal,
       position: p,
     })
-  }
-}
-
-impl Shape for Triangle {
-  fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-    self.intersect_mt(&ray)
-  }
-
-  fn aabb(&self) -> AABB {
-    let min = Vector3::new(
-      self.p0.x.min(self.p1.x).min(self.p2.x),
-      self.p0.y.min(self.p1.y).min(self.p2.y),
-      self.p0.z.min(self.p1.z).min(self.p2.z),
-    );
-    let max = Vector3::new(
-      self.p0.x.max(self.p1.x).max(self.p2.x),
-      self.p0.y.max(self.p1.y).max(self.p2.y),
-      self.p0.z.max(self.p1.z).max(self.p2.z),
-    );
-    AABB {
-      min: min,
-      max: max,
-      center: (max + min) / 2.0,
-    }
-  }
-}
-
-impl SurfaceShape for Triangle {
-  fn area(&self) -> f32 {
-    self.area
   }
 }

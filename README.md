@@ -8,6 +8,10 @@ Bounding volume hierarchy implementation in rust.
 
 ## Benchmark
 
+```
+RUSTFLAGS='--emit asm -C target-feature=+avx' cargo bench
+```
+
 ### Construction
 
 ```
