@@ -133,6 +133,7 @@ fn obj(path: &Path) -> Vec<Box<Shape>> {
       instances.push(box Triangle::new(polygon[0], polygon[1], polygon[2]));
     }
   }
+  println!("{} triangles", instances.len());
   instances
 }
 
