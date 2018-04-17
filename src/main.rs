@@ -32,6 +32,7 @@ fn main() {
   let split: usize = 100;
   // let mut objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
   let objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
+  // let objects = obj(&Path::new("models/monkey/monkey.obj"));
   println!("obj loaded");
   // let objects_ = obj(&path);
   let start_time = time::now();

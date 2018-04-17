@@ -1,6 +1,7 @@
 extern crate ordered_float;
 
-use math::vector::Vector3;
+use std::f32;
+use math::vector::*;
 use ray::Ray;
 use self::ordered_float::OrderedFloat;
 use constant::*;
@@ -21,6 +22,11 @@ impl AABB {
     )
   }
 
+  pub fn surface_area(&self) -> f32 {
+    let side = self.side();
+    2.0 * (side.x * side.y + side.y * side.z + side.z * side.x)
+  }
+
   pub fn merge(list: &Vec<&AABB>) -> AABB {
     let min = Vector3::new(
       *list.iter().map(|v| OrderedFloat(v.min.x)).min().unwrap(),
@@ -36,6 +42,32 @@ impl AABB {
       min: min,
       max: max,
       center: (min + max) / 2.0,
+    }
+  }
+
+  pub fn merge_with(&self, v: &AABB) -> AABB {
+    let min = Vector3::new(
+      self.min.x.min(v.min.x),
+      self.min.y.min(v.min.y),
+      self.min.z.min(v.min.z),
+    );
+    let max = Vector3::new(
+      self.max.x.max(v.max.x),
+      self.max.y.max(v.max.y),
+      self.max.z.max(v.max.z),
+    );
+    AABB {
+      min: min,
+      max: max,
+      center: (min + max) / 2.0,
+    }
+  }
+
+  pub fn empty() -> AABB {
+    AABB {
+      min: Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY),
+      max: Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY),
+      center: Vector3::zero(),
     }
   }
 

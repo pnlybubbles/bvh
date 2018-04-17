@@ -55,7 +55,6 @@ pub struct BVH<'a> {
 
 impl<'a> BVH<'a> {
   pub fn new(list: &'a [Box<Shape>]) -> BVH<'a> {
-    // let mut indexes = (0..list.len()).enumerate().map( |(i, _)| i ).collect::<Vec<usize>>();
     let mut leaf = list.iter().enumerate().map( |(i, v)| Leaf {
       aabb: v.aabb().clone(),
       index: i,
@@ -68,27 +67,56 @@ impl<'a> BVH<'a> {
   }
 
   fn construct(list: &mut [Leaf]) -> Box<Branch> {
+    // TODO
+    let t_aabb = 1.0;
+    let t_tri = 2.0;
     // セットアップ
-    let len = list.len();
+    let n = list.len();
     // 要素が1つのときは葉
-    if len == 1 {
+    if n == 1 {
       return box list[0].clone();
     }
-    // 全体のAABBを作成
-    let aabb = AABB::merge(&list.iter().map( |v| &v.aabb ).collect());
-    // 最大のAABBの辺を基準にして分割する
-    // 最大のAABBの辺のインデックスを求める
-    let sides: [f32; 3] = aabb.side().into();
-    let partition_axis = sides.iter()
-      .enumerate().max_by_key( |&(_, v)| OrderedFloat(*v) )
-      .map( |(i, _)| i ).unwrap_or(0);
+    // 全体のAABB
+    let mut aabb = AABB::empty();
+    // SAHに基づいた最良の分割軸とインデックスを取得
+    let (partition_axis, partition_index, _) = (0..3).map( |axis| {
+      // 基準の軸でソート
+      list.sort_unstable_by_key( |v| {
+        OrderedFloat(v.aabb.center[axis])
+      });
+      // S1のAABBの表面積
+      let mut s1_aabb = list[0].aabb.clone();
+      let mut s1_a = Vec::with_capacity(n - 1);
+      for leaf in list[0..n].iter() {
+        s1_aabb = s1_aabb.merge_with(&leaf.aabb);
+        s1_a.push(s1_aabb.surface_area());
+      }
+      // S2のAABBの表面積
+      let mut s2_aabb = list[n - 1].aabb.clone();
+      let mut s2_a = Vec::with_capacity(n - 1);
+      for leaf in list[1..].iter().rev() {
+        s2_aabb = s2_aabb.merge_with(&leaf.aabb);
+        s2_a.push(s2_aabb.surface_area());
+      }
+      // 全体SのAABBの表面積
+      aabb = s1_aabb.merge_with(&list[n - 1].aabb);
+      let s_a = aabb.surface_area();
+      // SAHのスコアを評価
+      (0..n - 1).map( |i| {
+        // ポリゴン数
+        let s1_n = (i + 1) as f32;
+        let s2_n = (n - i - 1) as f32;
+        // Surface Area Heuristics
+        // T = 2 * T_aabb + (A(S1) * N(S1) + A(S2) * N(S2)) * T_tri / A(S)
+        OrderedFloat(2.0 * t_aabb + (s1_a[i] * s1_n + s2_a[n - i - 2] * s2_n) * t_tri / s_a)
+      }).enumerate().min_by_key( |&(_, t)| t ).unwrap()
+    }).enumerate().min_by_key( |&(_, (_, t))| t ).map( |(a, (i, t))| (a, i + 1, t) ).unwrap();
     // 基準の軸でソート
     list.sort_unstable_by_key( |v| {
       OrderedFloat(v.aabb.center[partition_axis])
     });
-    // 分割するインデックスを求める
-    let partition_index = len / 2; // i-1とiの間で分割
     // 再帰的に子要素を生成
+    debug_assert!(partition_index != 0 && partition_index != n);
     let left = Self::construct(&mut list[0..partition_index]);
     let right = Self::construct(&mut list[partition_index..]);
     box Node {
