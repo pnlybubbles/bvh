@@ -31,7 +31,7 @@ use aabb::AABB;
 fn main() {
   let split: usize = 100;
   // let mut objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
-  let objects = obj(&Path::new("models/monkey/monkey.obj"));
+  let objects = obj(&Path::new("models/happy_vrip/buddha.obj"));
   println!("obj loaded");
   // let objects_ = obj(&path);
   let start_time = time::now();
@@ -206,14 +206,14 @@ mod tests {
     }).collect()
   }
 
-  #[bench]
-  fn bench_construct_bvh(b: &mut Bencher) {
-    println!("");
-    let objects = obj(&Path::new("models/bunny/bunny.obj"));
-    b.iter( || {
-      BVH::new(&objects);
-    })
-  }
+  // #[bench]
+  // fn bench_construct_bvh(b: &mut Bencher) {
+  //   println!("");
+  //   let objects = obj(&Path::new("models/bunny/bunny.obj"));
+  //   b.iter( || {
+  //     BVH::new(&objects);
+  //   })
+  // }
 
   #[bench]
   fn bench_intersection_bvh(b: &mut Bencher) {
@@ -221,7 +221,7 @@ mod tests {
     let objects = obj(&Path::new("models/sponza/sponza.obj"));
     let bvh = BVH::new(&objects);
     let mut rng = rand::XorShiftRng::new_unseeded();
-    let random_rays = random_ray_in_aabb(&bvh.aabb(), 10, &mut rng);
+    let random_rays = random_ray_in_aabb(&bvh.aabb(), 10000, &mut rng);
     b.iter( || {
       for ray in &random_rays {
         bvh.intersect(&ray);
@@ -285,7 +285,7 @@ mod tests {
       max: max,
       center: min + max / 2.0,
     };
-    let rays = random_ray_in_aabb(&aabb, 10, &mut rng);
+    let rays = random_ray_in_aabb(&aabb, 10000, &mut rng);
     let random_rays = rays.iter().map( |ray| {
       let origin = convert_nalgebra_point(ray.origin);
       let direction = convert_nalgebra_vector(ray.direction);
